@@ -26,7 +26,7 @@ file_watcher/
 │   │   ├── sync.rs
 │   │   ├── config.rs
 │   │   └── auth.rs
-│   ├── cloud/             # Cloud provider integrations
+│   ├── provider/             # Cloud provider integrations
 │   │   ├── mod.rs
 │   │   ├── aws_s3.rs
 │   │   ├── google_drive.rs
