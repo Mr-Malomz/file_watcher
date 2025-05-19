@@ -1,21 +1,15 @@
-use std::{error::Error, fmt::format, iter};
+use std::{error::Error, iter};
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{self},
-};
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     Frame, Terminal,
-    backend::{self, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    prelude::Backend,
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use super::data::{Commands, Provider};
+use super::data::Provider;
 
 #[derive(Default)]
 struct AppState {
@@ -26,7 +20,7 @@ struct AppState {
 
 pub fn runCli() -> Result<(), Box<dyn Error>> {
     // Initialize terminal
-    let mut stdout = std::io::stdout();
+    let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
