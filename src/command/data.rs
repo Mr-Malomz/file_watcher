@@ -47,7 +47,6 @@ pub enum Provider {
     GoogleDrive,
 }
 
-
 #[derive(Debug, Default)]
 pub struct AWS_Config {
     pub region: String,
