@@ -29,8 +29,8 @@ pub enum Commands {
         access_token: String,
         #[arg(short = 'p', long = "path_to_file")]
         path_to_file: String,
-        #[arg(short = 'k', long = "key")]
-        key: String,
+        // #[arg(short = 'k', long = "key")]
+        // key: String,
     },
     GoogleDrive {
         #[arg(short = 'a', long = "access_token")]

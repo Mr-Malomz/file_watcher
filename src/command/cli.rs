@@ -9,7 +9,12 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph},
 };
 
-use super::data::Provider;
+use crate::provider::{
+    aws_s3::upload_file_to_s3, dropbox::upload_file_to_dropbox,
+    google_drive::upload_file_to_google_drive,
+};
+
+use super::data::{Commands, Provider};
 
 #[derive(Debug, Clone)]
 enum AppMode {
@@ -33,9 +38,8 @@ impl Default for AppMode {
     }
 }
 
-
 pub fn runCli() -> Result<(), Box<dyn Error>> {
-    // Initialize terminal
+    // initialize terminal
     let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -78,7 +82,7 @@ pub fn runCli() -> Result<(), Box<dyn Error>> {
                 AppMode::FillingFields => {
                     match key.code {
                         KeyCode::Esc => {
-                            // Go back to provider selection
+                            // go back to provider selection
                             app.mode = AppMode::SelectingProvider;
                             app.selected_provider = None;
                             app.input_fields.clear();
@@ -98,17 +102,37 @@ pub fn runCli() -> Result<(), Box<dyn Error>> {
                             }
                         }
                         KeyCode::Enter => {
-                            // Validate that all fields are filled
+                            // validate that all fields are filled
                             let all_filled = app
                                 .input_fields
                                 .iter()
                                 .all(|(_, value)| !value.trim().is_empty());
+
+                            // convert the input field into a command that get the value and handle the upload
                             if all_filled {
-                                println!("\nInput complete. Processing upload...");
-                                print_collected_data(&app);
+                                let cmd = match app.selected_provider {
+                                    Some(Provider::AWS) => Commands::AWS {
+                                        region: app.input_fields[0].1.clone(),
+                                        bucket_name: app.input_fields[1].1.clone(),
+                                        path_to_file: app.input_fields[2].1.clone(),
+                                        key: app.input_fields[3].1.clone(),
+                                    },
+                                    Some(Provider::GoogleDrive) => Commands::GoogleDrive {
+                                        access_token: app.input_fields[0].1.clone(),
+                                        path_to_file: app.input_fields[1].1.clone(),
+                                    },
+                                    Some(Provider::Dropbox) => Commands::Dropbox {
+                                        access_token: app.input_fields[0].1.clone(),
+                                        path_to_file: app.input_fields[1].1.clone(),
+                                    },
+                                    None => continue,
+                                };
+                                let rt = tokio::runtime::Runtime::new()?;
+                                rt.block_on(handle_upload(cmd));
+                                crossterm::terminal::disable_raw_mode()?;
                                 break;
                             } else {
-                                // You could add error handling here, for now just continue
+                                // error handling here, for now just continue
                             }
                         }
                         KeyCode::Char(c) => {
@@ -280,7 +304,6 @@ fn set_fields_for_providers(app: &mut AppState) {
             app.input_fields = vec![
                 ("Access Token".to_string(), "".to_string()),
                 ("Path to File".to_string(), "".to_string()),
-                ("Key".to_string(), "".to_string()),
             ];
         }
         Some(Provider::AWS) => {
@@ -297,10 +320,39 @@ fn set_fields_for_providers(app: &mut AppState) {
     app.selected_input_index = 0;
 }
 
-fn print_collected_data(app: &AppState) {
-    println!("Selected Provider: {:?}", app.selected_provider);
-    println!("Configuration:");
-    for (label, value) in &app.input_fields {
-        println!("  {}: {}", label, value);
+async fn handle_upload(cmd: Commands) {
+    match cmd {
+        Commands::AWS {
+            region,
+            bucket_name,
+            path_to_file,
+            key,
+        } => {
+            // handle AWS upload logic here
+            match upload_file_to_s3(&bucket_name, &path_to_file, &key, &region).await {
+                Ok(output) => println!("File uploaded successfully: {:?}", output),
+                Err(e) => eprintln!("Failed to upload file: {:?}", e),
+            }
+        }
+        Commands::GoogleDrive {
+            access_token,
+            path_to_file,
+        } => {
+            // handle Google Drive upload logic here
+            match upload_file_to_google_drive(&access_token, &path_to_file).await {
+                Ok(output) => println!("File uploaded successfully: {:?}", output),
+                Err(e) => eprintln!("Failed to upload file: {:?}", e),
+            }
+        }
+        Commands::Dropbox {
+            access_token,
+            path_to_file,
+        } => {
+            // handle Dropbox upload logic here
+            match upload_file_to_dropbox(&access_token, &path_to_file).await {
+                Ok(output) => println!("File uploaded successfully: {:?}", output),
+                Err(e) => eprintln!("Failed to upload file: {:?}", e),
+            }
+        }
     }
 }
