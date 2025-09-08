@@ -1,8 +1,8 @@
 mod command;
 mod provider;
-use command::cli::runCli;
+mod watcher;
+use command::cli::run_cli;
 
 fn main() {
-    println!("Hello, world!");
-    runCli();
+    let _ = run_cli();
 }

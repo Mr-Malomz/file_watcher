@@ -39,9 +39,6 @@ file_watcher/
 │       ├── mod.rs
 │       ├── logger.rs
 │       └── config.rs
-├── tests/                 # Integration and unit tests
-│   ├── integration_test.rs
-│   └── unit_test.rs
 ├── examples/              # Example usage scenarios
 │   └── basic_sync.rs
 └── README.md

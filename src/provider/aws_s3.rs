@@ -1,45 +1,15 @@
-/// Uploads a file to an Amazon S3 bucket.
-///
-/// # Parameters
-///
-/// - `bucket_name`: The name of the S3 bucket where the file will be uploaded.
-/// - `path_to_file`: The local file path of the file to be uploaded.
-/// - `key`: The key (or object name) under which the file will be stored in the S3 bucket.
-/// - `region`: The AWS region where the S3 bucket is located.
-///
-/// # Returns
-///
-/// Returns a `Result` containing the `PutObjectOutput` on success, or an `SdkError<PutObjectError>`
-/// on failure.
-///
-/// # Errors
-///
-/// This function may return an error in the following cases:
-/// - If the file at `path_to_file` cannot be read or converted into a `ByteStream`.
-/// - If the S3 client fails to upload the file due to network issues, invalid credentials,
-///   or other AWS SDK-related errors.
-///
-/// # Example
-///
-/// ```rust
-/// let result = upload_file_to_s3("my-bucket", "/path/to/file.txt", "file.txt", "us-east-1").await;
-/// match result {
-///     Ok(output) => println!("File uploaded successfully: {:?}", output),
-///     Err(e) => eprintln!("Failed to upload file: {:?}", e),
-/// }
-/// ```
-///
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::{Client, config::Region, error::SdkError};
+use aws_sdk_s3::{Client, config::Region};
+use crate::command::data::AwsUploadResponse;
+use std::path::Path;
 
 pub async fn upload_file_to_s3(
     bucket_name: &str,
     path_to_file: &str,
     key: &str,
     region: &str,
-) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+) -> Result<AwsUploadResponse, Box<dyn std::error::Error>> {
     // Create a region provider chain
     let region_provider =
         RegionProviderChain::first_try(Region::new(region.to_string())).or_default_provider();
@@ -48,17 +18,37 @@ pub async fn upload_file_to_s3(
     let shared_config = aws_config::from_env().region(region_provider).load().await;
     let client = Client::new(&shared_config);
 
+    // Extract filename from path
+    let file_path = Path::new(path_to_file);
+    let filename = file_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("Invalid file path")?;
+
     // Create the ByteStream from file and handle the error properly
     let body = ByteStream::from_path(path_to_file)
         .await
-        .map_err(|e| SdkError::construction_failure(e))?;
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Upload the file
-    client
+    let result = client
         .put_object()
         .bucket(bucket_name)
         .key(key)
         .body(body)
         .send()
-        .await
+        .await;
+
+    match result {
+        Ok(_output) => {
+            println!("File '{}' uploaded successfully to S3 bucket: {}", filename, bucket_name);
+            Ok(AwsUploadResponse {
+                success: true,
+                message: format!("Successfully uploaded {} to s3://{}/{}", filename, bucket_name, key),
+            })
+        }
+        Err(e) => {
+            Err(format!("AWS S3 upload error: {}", e).into())
+        }
+    }
 }
